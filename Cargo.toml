@@ -9,3 +9,4 @@ description = "a Rust implementation of opfs"
 
 [dependencies]
 clap = "2.33.0"
+memmap = "0.7.0"
