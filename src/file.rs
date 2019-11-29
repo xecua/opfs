@@ -2,11 +2,11 @@ use memmap::{MmapMut, MmapOptions};
 use std::fs::{metadata, File, OpenOptions};
 use std::io;
 
-pub fn get_file_size(path: String) -> io::Result<usize> {
+pub fn get_file_size(path: &str) -> io::Result<usize> {
     Ok(metadata(path)?.len() as usize)
 }
 
-pub fn open_readable_and_writable_file(path: String) -> io::Result<File> {
+pub fn open_readable_and_writable_file(path: &str) -> io::Result<File> {
     OpenOptions::new().read(true).write(true).open(path)
 }
 

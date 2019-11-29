@@ -1,33 +1,35 @@
 #[macro_use]
 extern crate clap;
 
-use memmap::MmapOptions;
-use std::fs::{metadata, OpenOptions};
-
-#[derive(Debug)]
-struct superblock {
-    magic: u32,      // Must be FSMAGIC
-    size: u32,       // Size of file system image (blocks)
-    nblocks: u32,    // Number of data blocks
-    ninodes: u32,    // Number of inodes.
-    nlog: u32,       // Number of log blocks
-    logstart: u32,   // Block number of first log block
-    inodestart: u32, // Block number of first inode block
-    bmapstart: u32,  // Block number of first free map block
-}
-
-fn u8_slice_as_superblock(s: &[u8]) -> superblock {
-    let p = s.as_ptr() as *const [u8; std::mem::size_of::<superblock>()];
-    unsafe { std::mem::transmute(*p) }
-}
+use clap::Arg;
+use opfs::block::func::u8_slice_as_superblock;
+use opfs::file::*;
 
 fn main() {
-    // let _app = app_from_crate!().get_matches();
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("./fs.img")
-        .unwrap();
-    let mmap = unsafe { MmapOptions::new().len(file_size).map_mut(&file).unwrap() };
-    println!("{:?}", u8_slice_as_superblock(&*mmap));
+    let matches = app_from_crate!()
+        .arg(
+            Arg::with_name("PATH")
+                .help("image file path to manipulate")
+                .required(true)
+                .index(1),
+        )
+        .get_matches();
+    let path = matches.value_of("PATH").unwrap();
+    let file_size = match get_file_size(path) {
+        Ok(s) => s,
+        Err(e) => panic!("{}", e),
+    };
+    let file = match open_readable_and_writable_file(path) {
+        Ok(f) => f,
+        Err(e) => panic!("{}", e),
+    };
+    let m;
+    unsafe {
+        m = match get_memory_mapped_file(&file, file_size) {
+            Ok(m) => m,
+            Err(e) => panic!("{}", e),
+        };
+    };
+    println!("{:?}", m);
+    println!("{:?}", u8_slice_as_superblock(&*m));
 }
