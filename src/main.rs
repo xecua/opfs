@@ -8,13 +8,13 @@ use opfs::file::*;
 fn main() {
     let matches = app_from_crate!()
         .arg(
-            Arg::with_name("PATH")
-                .help("image file path to manipulate")
+            Arg::with_name("img_file")
+                .help("path to image file to manipulate")
                 .required(true)
                 .index(1),
         )
         .get_matches();
-    let path = matches.value_of("PATH").unwrap();
+    let path = matches.value_of("img_file").unwrap();
     let file_size = match get_file_size(path) {
         Ok(s) => s,
         Err(e) => panic!("{}", e),
