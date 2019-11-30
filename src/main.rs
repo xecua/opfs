@@ -2,7 +2,7 @@
 extern crate clap;
 
 use clap::Arg;
-use opfs::block::func::u8_slice_as_superblock;
+use opfs::block::sblock;
 use opfs::file::*;
 
 fn main() {
@@ -31,5 +31,6 @@ fn main() {
         };
     };
     println!("{:?}", m);
-    println!("{:?}", u8_slice_as_superblock(&*m));
+    let _s = sblock::check_magic_number(&m);
+    println!("ok");
 }
