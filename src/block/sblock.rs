@@ -12,7 +12,7 @@ pub struct superblock {
     nlog: u32,           // Number of log blocks
     logstart: u32,       // Block number of first log block
     pub inodestart: u32, // Block number of first inode block
-    bmapstart: u32,      // Block number of first free map block
+    pub bmapstart: u32,  // Block number of first free map block
 }
 
 pub fn u8_slice_as_superblock(s: &[u8]) -> superblock {
