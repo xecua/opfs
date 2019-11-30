@@ -1,7 +1,7 @@
 extern crate memmap;
 
-pub const BLOCK_SIZE: usize = 1024;
-
-pub mod block;
-pub mod file;
+pub mod converter;
+pub mod initializer;
 pub mod subcommand;
+pub mod types;
+pub mod utils;
