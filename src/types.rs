@@ -1,5 +1,5 @@
-// Super Block
 #[allow(non_camel_case_types)]
+// Super Block
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct superblock {
@@ -13,9 +13,9 @@ pub struct superblock {
     bmapstart: u32,      // Block number of first free map block
 }
 // dinode.type
-#[repr(i16)]
-#[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
+#[derive(Debug, Copy, Clone)]
+#[repr(i16)]
 pub enum InodeType {
     T_DIR = 1,
     T_FILE = 2,
@@ -35,7 +35,6 @@ impl std::fmt::Display for InodeType {
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
-#[allow(non_camel_case_types)]
 pub struct dinode {
     pub r#type: InodeType,         // file type
     major: i16,                    // device id
@@ -58,3 +57,4 @@ pub const DIRSIZ: usize = 14;
 pub const ROOT_INODE: usize = 1; // inode number of root directory("/")
 pub const DINODE_SIZE: usize = std::mem::size_of::<dinode>();
 pub const DIRENT_SIZE: usize = std::mem::size_of::<dirent>();
+pub const U32_PER_BLOCK: usize = BLOCK_SIZE / std::mem::size_of::<u32>();

@@ -18,13 +18,3 @@ pub fn u8_slice_as_dinode(slice: &[u8]) -> dinode {
 pub fn u8_slice_as_dirent(slice: &[u8]) -> dirent {
     unsafe { std::mem::transmute(slice) }
 }
-
-pub fn u8_slice_as_dirents(slice: &[u8], sblock: &superblock) -> Vec<dirent> {
-    let mut dirents = Vec::new();
-    for i in 0..BLOCK_SIZE / DIRENT_SIZE {
-        dirents.push(u8_slice_as_dirent(
-            &slice[inode_num_to_addr_range(i, &sblock)],
-        ));
-    }
-    dirents
-}
