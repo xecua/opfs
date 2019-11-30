@@ -48,10 +48,11 @@ pub struct dirent {
 
 pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, sblock: &superblock) -> dinode {
     if inode_num >= sblock.ninodes {
-        panic!(
+        eprintln!(
             "inode access number limit exceeded: must be less than {}, given {}",
             sblock.ninodes, inode_num
         );
+        std::process::exit(1);
     }
     let inodestart_byte = sblock.inodestart as usize * BLOCK_SIZE;
     let p = m[inodestart_byte + (inode_num as usize) * DINODE_SIZE

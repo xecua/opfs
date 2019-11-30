@@ -5,6 +5,7 @@ use clap::{AppSettings, Arg, SubCommand};
 use opfs::block::sblock;
 use opfs::file::*;
 use opfs::subcommand;
+use std::process::exit;
 
 fn main() {
     let matches = app_from_crate!()
@@ -45,15 +46,24 @@ fn main() {
     let path = matches.value_of("img_file").unwrap();
     let file_size = match get_file_size(path) {
         Ok(s) => s,
-        Err(e) => panic!("{}", e),
+        Err(e) => {
+            eprintln!("{}", e);
+            exit(1);
+        }
     };
     let file = match open_readable_and_writable_file(path) {
         Ok(f) => f,
-        Err(e) => panic!("{}", e),
+        Err(e) => {
+            eprintln!("{}", e);
+            exit(1);
+        }
     };
     let m = match get_memory_mapped_file(&file, file_size) {
         Ok(m) => m,
-        Err(e) => panic!("{}", e),
+        Err(e) => {
+            eprintln!("{}", e);
+            exit(1);
+        }
     };
     let sblock = sblock::u8_slice_as_superblock(&m);
     sblock::check_magic_number(&sblock);

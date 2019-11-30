@@ -23,6 +23,7 @@ pub fn u8_slice_as_superblock(s: &[u8]) -> superblock {
 
 pub fn check_magic_number(s: &superblock) {
     if s.magic != 0x10203040 {
-        panic!("magic number is invalid: {:x}", s.magic);
+        eprintln!("magic number is invalid: {:x}", s.magic);
+        std::process::exit(1);
     }
 }
