@@ -1,10 +1,10 @@
 use crate::block::sblock::superblock;
 use crate::BLOCK_SIZE;
 
-const NDIRECT: usize = 12;
+pub const NDIRECT: usize = 12;
 const DIRSIZ: usize = 14;
 
-const DINODE_SIZE: usize = std::mem::size_of::<dinode>();
+pub const DINODE_SIZE: usize = std::mem::size_of::<dinode>();
 const DIRENT_SIZE: usize = std::mem::size_of::<dirent>();
 
 // dinode.type
@@ -63,10 +63,18 @@ pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, super_block: &superblock) ->
 pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
     let mut dirents = Vec::new();
     for i in 0..BLOCK_SIZE / DIRENT_SIZE {
-        let p = m
-            [block_num * BLOCK_SIZE + DIRENT_SIZE * i..block_num * BLOCK_SIZE + DIRENT_SIZE * i + 1]
+        let p = m[block_num * BLOCK_SIZE + DIRENT_SIZE * i
+            ..block_num * BLOCK_SIZE + DIRENT_SIZE * (i + 1)]
             .as_ptr() as *const [u8; std::mem::size_of::<dirent>()];
         unsafe { dirents.push(std::mem::transmute(*p)) };
     }
     dirents
+}
+
+// for indirect reference
+const U32_PER_BLOCK: usize = BLOCK_SIZE / std::mem::size_of::<u32>();
+pub fn u8_slice_as_u32_slice(m: &[u8], block_num: usize) -> [u32; U32_PER_BLOCK] {
+    let p =
+        m[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE].as_ptr() as *const [u8; BLOCK_SIZE];
+    unsafe { std::mem::transmute(*p) }
 }
