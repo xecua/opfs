@@ -2,7 +2,7 @@ use crate::block::sblock::superblock;
 use crate::BLOCK_SIZE;
 
 pub const NDIRECT: usize = 12;
-const DIRSIZ: usize = 14;
+pub const DIRSIZ: usize = 14;
 
 pub const DINODE_SIZE: usize = std::mem::size_of::<dinode>();
 const DIRENT_SIZE: usize = std::mem::size_of::<dirent>();
@@ -34,7 +34,7 @@ pub struct dinode {
     pub r#type: InodeType,         // file type
     major: i16,                    // device id
     minor: i16,                    // device id
-    pub jnlink: i16,               // number of links
+    pub nlink: i16,                // number of links
     pub size: u32,                 // file size
     pub addrs: [u32; NDIRECT + 1], // data block reference
 }

@@ -3,6 +3,8 @@ use crate::block::sblock::superblock;
 use memmap::MmapMut;
 use std::convert::TryInto;
 
+const ROOT_INODE: u32 = 1; // inode number of root directory("/")
+
 // explore the given path, and return its inode
 fn explore_path(m: &MmapMut, path: &str, super_block: &superblock) -> Result<dinode, String> {
     use crate::block::inode::*;
@@ -49,9 +51,6 @@ fn explore_path(m: &MmapMut, path: &str, super_block: &superblock) -> Result<din
     }
     Ok(current_inode)
 }
-
-const ROOT_INODE: u32 = 1; // inode number of root directory("/")
-
 pub fn ls(m: &MmapMut, path: &str, super_block: &superblock) {
     use crate::block::inode::*;
     use std::str::from_utf8;
@@ -70,7 +69,15 @@ pub fn ls(m: &MmapMut, path: &str, super_block: &superblock) {
                 if name.is_empty() {
                     continue;
                 }
-                println!("{}", name);
+                let inode = u8_slice_as_dinode(&m, entry.inum.into(), &super_block);
+                println!(
+                    "{:<width$}: {}, No.{}, {} Bytes",
+                    name,
+                    inode.r#type,
+                    entry.inum,
+                    inode.size,
+                    width = DIRSIZ
+                );
             }
         }
         InodeType::T_FILE | InodeType::T_DEV => println!("{}", path),
