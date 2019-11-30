@@ -1,11 +1,10 @@
+use crate::block::inode::dinode;
 use crate::block::sblock::superblock;
-use crate::BLOCK_SIZE;
 use memmap::MmapMut;
 use std::convert::TryInto;
 
-const ROOT_INODE: u32 = 1; // inode number of root directory("/")
-
-pub fn ls(m: &MmapMut, path: &str, super_block: &superblock) {
+// explore the given path, and return its inode
+fn explore_path(m: &MmapMut, path: &str, super_block: &superblock) -> Result<dinode, String> {
     use crate::block::inode::*;
     use std::str::from_utf8;
 
@@ -45,14 +44,27 @@ pub fn ls(m: &MmapMut, path: &str, super_block: &superblock) {
                 }
             }
             // coming here means file does not exist.
-            eprintln!("ls: {}: no such file or directory", path);
-            std::process::exit(1);
+            return Err(format!("{}: no such file or directory", path));
         }
     }
+    Ok(current_inode)
+}
 
-    match current_inode.r#type {
+const ROOT_INODE: u32 = 1; // inode number of root directory("/")
+
+pub fn ls(m: &MmapMut, path: &str, super_block: &superblock) {
+    use crate::block::inode::*;
+    use std::str::from_utf8;
+
+    let inode = explore_path(m, path, super_block);
+    if inode.is_err() {
+        eprintln!("ls: {}", inode.unwrap_err());
+        return;
+    }
+    let inode = inode.unwrap();
+    match inode.r#type {
         InodeType::T_DIR => {
-            let d = u8_slice_as_dirents(&m, current_inode.addrs[0].try_into().unwrap());
+            let d = u8_slice_as_dirents(&m, inode.addrs[0].try_into().unwrap());
             for entry in d.into_iter() {
                 let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
                 if name.is_empty() {
