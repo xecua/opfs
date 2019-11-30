@@ -6,7 +6,7 @@ use crate::BLOCK_SIZE;
 #[repr(C)]
 pub struct superblock {
     pub magic: u32,      // Must be FSMAGIC
-    size: u32,           // Size of file system image (blocks)
+    pub size: u32,       // Size of file system image (blocks)
     nblocks: u32,        // Number of data blocks
     pub ninodes: u32,    // Number of inodes.
     nlog: u32,           // Number of log blocks

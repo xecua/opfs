@@ -20,9 +20,25 @@ fn main() {
                 .about("list directory contents")
                 .arg(
                     Arg::with_name("path")
-                        .help("path to look up")
+                        .help("path to file to look up")
                         .required(true)
                         .index(1),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("get")
+                .about("extract file")
+                .arg(
+                    Arg::with_name("source")
+                        .help("path to file to extract")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::with_name("destination")
+                        .help("destination path of host")
+                        .required(true)
+                        .index(2),
                 ),
         )
         .get_matches();
@@ -35,18 +51,19 @@ fn main() {
         Ok(f) => f,
         Err(e) => panic!("{}", e),
     };
-    let m;
-    unsafe {
-        m = match get_memory_mapped_file(&file, file_size) {
-            Ok(m) => m,
-            Err(e) => panic!("{}", e),
-        };
+    let m = match get_memory_mapped_file(&file, file_size) {
+        Ok(m) => m,
+        Err(e) => panic!("{}", e),
     };
-    let super_block = sblock::u8_slice_as_superblock(&m);
-    sblock::check_magic_number(&super_block);
+    let sblock = sblock::u8_slice_as_superblock(&m);
+    sblock::check_magic_number(&sblock);
 
     if let Some(ref matches) = matches.subcommand_matches("ls") {
         let path = matches.value_of("path").unwrap();
-        subcommand::ls(&m, &path, &super_block);
+        subcommand::ls(&m, &path, &sblock);
+    } else if let Some(ref matches) = matches.subcommand_matches("get") {
+        let src = matches.value_of("source").unwrap();
+        let dst = matches.value_of("destination").unwrap();
+        subcommand::get(&m, &src, &dst, &sblock);
     }
 }

@@ -46,14 +46,14 @@ pub struct dirent {
     pub name: [u8; DIRSIZ],
 }
 
-pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, super_block: &superblock) -> dinode {
-    if inode_num >= super_block.ninodes {
+pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, sblock: &superblock) -> dinode {
+    if inode_num >= sblock.ninodes {
         panic!(
             "inode access number limit exceeded: must be less than {}, given {}",
-            super_block.ninodes, inode_num
+            sblock.ninodes, inode_num
         );
     }
-    let inodestart_byte = super_block.inodestart as usize * BLOCK_SIZE;
+    let inodestart_byte = sblock.inodestart as usize * BLOCK_SIZE;
     let p = m[inodestart_byte + (inode_num as usize) * DINODE_SIZE
         ..inodestart_byte + ((inode_num as usize) + 1) * DINODE_SIZE]
         .as_ptr() as *const [u8; DINODE_SIZE];

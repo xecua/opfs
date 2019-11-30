@@ -10,6 +10,14 @@ pub fn open_readable_and_writable_file(path: &str) -> io::Result<File> {
     OpenOptions::new().read(true).write(true).open(path)
 }
 
-pub unsafe fn get_memory_mapped_file(file: &File, len: usize) -> io::Result<MmapMut> {
-    MmapOptions::new().len(len).map_mut(&file)
+pub fn get_memory_mapped_file(file: &File, len: usize) -> io::Result<MmapMut> {
+    unsafe { MmapOptions::new().len(len).map_mut(&file) }
+}
+
+pub fn open_new_file(path: &str) -> io::Result<File> {
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
 }
