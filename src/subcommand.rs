@@ -53,6 +53,7 @@ fn explore_path(img: &MmapMut, path: &str, sblock: &superblock) -> Result<dinode
     }
     Ok(current_inode)
 }
+
 pub fn ls(img: &MmapMut, path: &str, sblock: &superblock) {
     use crate::block::inode::*;
     use std::str::from_utf8;
@@ -119,7 +120,7 @@ pub fn get(img: &MmapMut, src: &str, dst: &str, sblock: &superblock) {
 
     let inode = explore_path(&img, src, &sblock);
     if inode.is_err() {
-        eprintln!("ls: {}", inode.unwrap_err());
+        eprintln!("get: {}", inode.unwrap_err());
         return;
     }
     let inode = inode.unwrap();
@@ -179,5 +180,128 @@ pub fn get(img: &MmapMut, src: &str, dst: &str, sblock: &superblock) {
             "get: written size does not match. expected: {}, actual: {}",
             inode.size, written_size
         );
+    }
+}
+
+pub fn rm(img: &mut MmapMut, path: &str, sblock: &superblock) {
+    use crate::block::inode::*;
+    use std::str::from_utf8;
+
+    let mut dirent_block_index = 0;
+    let mut dirent_offset = 0;
+    let mut parent_inode = u8_slice_as_dinode(&img, ROOT_INODE, &sblock);
+    let mut current_inode = u8_slice_as_dinode(&img, ROOT_INODE, &sblock);
+    let mut is_direct = true;
+    if path != "/" {
+        'directory: for file_name in path.split("/").skip(1) {
+            for i in 0..NDIRECT {
+                if current_inode.addrs[i] == 0 {
+                    break;
+                }
+                for (j, entry) in u8_slice_as_dirents(&img, current_inode.addrs[i] as usize)
+                    .into_iter()
+                    .enumerate()
+                {
+                    let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
+                    if name.is_empty() {
+                        break;
+                    }
+                    if name == file_name {
+                        parent_inode = current_inode;
+                        current_inode = u8_slice_as_dinode(&img, entry.inum.into(), &sblock);
+                        dirent_block_index = i;
+                        dirent_offset = j;
+                        is_direct = true;
+                        continue 'directory;
+                    }
+                }
+            }
+            // indirect reference block
+            for i in u8_slice_as_u32_slice(&img, current_inode.addrs[NDIRECT] as usize).into_iter()
+            {
+                if *i == 0u32 {
+                    break;
+                }
+                for (j, entry) in u8_slice_as_dirents(&img, (*i) as usize)
+                    .into_iter()
+                    .enumerate()
+                {
+                    let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
+                    if name.is_empty() {
+                        break;
+                    }
+                    if name == file_name {
+                        parent_inode = current_inode;
+                        current_inode = u8_slice_as_dinode(&img, entry.inum.into(), &sblock);
+                        dirent_block_index = *i as usize;
+                        dirent_offset = j;
+                        is_direct = false;
+                        continue 'directory;
+                    }
+                }
+            }
+            // coming here means file does not exist.
+            eprintln!("{}: no such file or directory", path);
+            return;
+        }
+    }
+
+    match current_inode.r#type {
+        InodeType::T_DIR => {
+            eprintln!("rm: {} is a directory.", path);
+            return;
+        }
+        InodeType::T_DEV => {
+            eprintln!("rm: {} is a device file.", path);
+            return;
+        }
+        InodeType::T_FILE => {}
+    }
+
+    let dirent = if is_direct {
+        let dirents = u8_slice_as_dirents(&img, parent_inode.addrs[dirent_block_index] as usize);
+        *dirents.iter().nth(dirent_offset).unwrap()
+    } else {
+        let indirect_dirents = u8_slice_as_u32_slice(&img, parent_inode.addrs[NDIRECT] as usize);
+        let dirents = u8_slice_as_dirents(&img, indirect_dirents[dirent_block_index] as usize);
+        *dirents.iter().nth(dirent_offset).unwrap()
+    };
+    println!("{:?}", current_inode);
+    println!("{:?}", dirent);
+    // for now, won't change bitmap block
+    if current_inode.nlink != 1 {
+        // update inode information(nlink)
+        current_inode.nlink -= 1;
+        let new_inode = dinode_as_u8_slice(&current_inode);
+        let inode_addr =
+            (sblock.inodestart as usize) * BLOCK_SIZE + (dirent.inum as usize) * DINODE_SIZE; // inode start address
+        for i in 0..DINODE_SIZE {
+            img[inode_addr + i] = new_inode[i];
+        }
+    } else {
+        // fill related data block with 0, then inode
+        for block_num in current_inode.addrs.iter() {
+            for i in 0..BLOCK_SIZE {
+                img[(*block_num as usize) * BLOCK_SIZE + i] = 0;
+            }
+        }
+        let inode_addr =
+            (sblock.inodestart as usize) * BLOCK_SIZE + (dirent.inum as usize) * DINODE_SIZE; // inode start address
+        for i in 0..DINODE_SIZE {
+            img[inode_addr + i] = 0;
+        }
+    }
+    println!("{:?}", current_inode);
+
+    // dirent address
+    let dirent_addr = if is_direct {
+        BLOCK_SIZE * parent_inode.addrs[dirent_block_index] as usize + DIRENT_SIZE * dirent_offset
+    } else {
+        let indirect_dirents = u8_slice_as_u32_slice(&img, parent_inode.addrs[NDIRECT] as usize);
+        BLOCK_SIZE * indirect_dirents[dirent_block_index] as usize + DIRENT_SIZE * dirent_offset
+    };
+    // fill dirent with 0
+    for i in 0..DIRENT_SIZE {
+        img[dirent_addr + i] = 0;
     }
 }

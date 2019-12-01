@@ -5,7 +5,7 @@ pub const NDIRECT: usize = 12;
 pub const DIRSIZ: usize = 14;
 
 pub const DINODE_SIZE: usize = std::mem::size_of::<dinode>();
-const DIRENT_SIZE: usize = std::mem::size_of::<dirent>();
+pub const DIRENT_SIZE: usize = std::mem::size_of::<dirent>();
 
 // dinode.type
 #[repr(i16)]
@@ -27,9 +27,9 @@ impl std::fmt::Display for InodeType {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
-#[allow(non_camel_case_types)]
 pub struct dinode {
     pub r#type: InodeType,         // file type
     major: i16,                    // device id
@@ -61,12 +61,21 @@ pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, sblock: &superblock) -> dino
     unsafe { std::mem::transmute(*p) }
 }
 
+pub fn dinode_as_u8_slice(d: &dinode) -> &[u8] {
+    unsafe { std::slice::from_raw_parts((d as *const dinode) as *const u8, DINODE_SIZE) }
+}
+
+pub fn u8_slice_as_dirent(m: &[u8], addr: usize) -> dirent {
+    let p = m[addr..addr + DIRENT_SIZE].as_ptr() as *const [u8; DIRENT_SIZE];
+    unsafe { std::mem::transmute(*p) }
+}
+
 pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
     let mut dirents = Vec::new();
     for i in 0..BLOCK_SIZE / DIRENT_SIZE {
         let p = m[block_num * BLOCK_SIZE + DIRENT_SIZE * i
             ..block_num * BLOCK_SIZE + DIRENT_SIZE * (i + 1)]
-            .as_ptr() as *const [u8; std::mem::size_of::<dirent>()];
+            .as_ptr() as *const [u8; DIRENT_SIZE];
         unsafe { dirents.push(std::mem::transmute(*p)) };
     }
     dirents

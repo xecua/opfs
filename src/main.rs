@@ -42,6 +42,16 @@ fn main() {
                         .index(2),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("rm")
+                .about("remove directory entries")
+                .arg(
+                    Arg::with_name("path")
+                        .help("path to file to remove")
+                        .required(true)
+                        .index(1),
+                ),
+        )
         .get_matches();
     let path = matches.value_of("img_file").unwrap();
     let file_size = match get_file_size(path) {
@@ -58,22 +68,25 @@ fn main() {
             exit(1);
         }
     };
-    let m = match get_memory_mapped_file(&file, file_size) {
+    let mut img = match get_memory_mapped_file(&file, file_size) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("{}", e);
             exit(1);
         }
     };
-    let sblock = sblock::u8_slice_as_superblock(&m);
+    let sblock = sblock::u8_slice_as_superblock(&img);
     sblock::check_magic_number(&sblock);
 
     if let Some(ref matches) = matches.subcommand_matches("ls") {
         let path = matches.value_of("path").unwrap();
-        subcommand::ls(&m, &path, &sblock);
+        subcommand::ls(&img, &path, &sblock);
     } else if let Some(ref matches) = matches.subcommand_matches("get") {
         let src = matches.value_of("source").unwrap();
         let dst = matches.value_of("destination").unwrap();
-        subcommand::get(&m, &src, &dst, &sblock);
+        subcommand::get(&img, &src, &dst, &sblock);
+    } else if let Some(ref matches) = matches.subcommand_matches("rm") {
+        let path = matches.value_of("path").unwrap();
+        subcommand::rm(&mut img, &path, &sblock);
     }
 }
