@@ -17,13 +17,9 @@ fn explore_path(img: &MmapMut, path: &str, sblock: &superblock) -> Result<dinode
                 if current_inode.addrs[i] == 0 {
                     break;
                 }
-                let d = u8_slice_as_dirents(&img, current_inode.addrs[i] as usize);
-                for entry in d.into_iter() {
-                    let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
-                    if name.is_empty() {
-                        break;
-                    }
-                    if name == file_name {
+                for entry in u8_slice_as_dirents(&img, current_inode.addrs[i] as usize).into_iter()
+                {
+                    if file_name == from_utf8(&entry.name).unwrap().trim_matches(char::from(0)) {
                         current_inode = u8_slice_as_dinode(&img, entry.inum.into(), &sblock);
                         continue 'directory;
                     }
@@ -33,15 +29,10 @@ fn explore_path(img: &MmapMut, path: &str, sblock: &superblock) -> Result<dinode
             for i in u8_slice_as_u32_slice(&img, current_inode.addrs[NDIRECT] as usize).into_iter()
             {
                 if *i == 0u32 {
-                    break;
+                    continue;
                 }
-                let d = u8_slice_as_dirents(&img, (*i) as usize);
-                for entry in d.into_iter() {
-                    let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
-                    if name.is_empty() {
-                        break;
-                    }
-                    if name == file_name {
+                for entry in u8_slice_as_dirents(&img, (*i) as usize).into_iter() {
+                    if file_name == from_utf8(&entry.name).unwrap().trim_matches(char::from(0)) {
                         current_inode = u8_slice_as_dinode(&img, entry.inum.into(), &sblock);
                         continue 'directory;
                     }
@@ -74,7 +65,7 @@ pub fn ls(img: &MmapMut, path: &str, sblock: &superblock) {
                 for entry in d.into_iter() {
                     let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
                     if name.is_empty() {
-                        break;
+                        continue;
                     }
                     let inode = u8_slice_as_dinode(&img, entry.inum.into(), &sblock);
                     println!(
@@ -96,7 +87,7 @@ pub fn ls(img: &MmapMut, path: &str, sblock: &superblock) {
                 for entry in d.into_iter() {
                     let name = from_utf8(&entry.name).unwrap().trim_matches(char::from(0));
                     if name.is_empty() {
-                        break;
+                        continue;
                     }
                     let inode = u8_slice_as_dinode(&img, entry.inum.into(), &sblock);
                     println!(
