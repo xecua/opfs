@@ -52,6 +52,22 @@ fn main() {
                         .index(1),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("put")
+                .about("put file into image file")
+                .arg(
+                    Arg::with_name("source")
+                        .help("path to file to put (host)")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::with_name("destination")
+                        .help("destination path of image file")
+                        .required(true)
+                        .index(2),
+                ),
+        )
         .get_matches();
     let path = matches.value_of("img_file").unwrap();
     let file_size = match get_file_size(path) {
@@ -88,5 +104,9 @@ fn main() {
     } else if let Some(ref matches) = matches.subcommand_matches("rm") {
         let path = matches.value_of("path").unwrap();
         subcommand::rm(&mut img, &path, &sblock);
+    } else if let Some(ref matches) = matches.subcommand_matches("put") {
+        let src = matches.value_of("source").unwrap();
+        let dst = matches.value_of("destination").unwrap();
+        subcommand::put(&mut img, &src, &dst, &sblock);
     }
 }

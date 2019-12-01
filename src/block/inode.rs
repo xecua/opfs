@@ -32,8 +32,8 @@ impl std::fmt::Display for InodeType {
 #[repr(C)]
 pub struct dinode {
     pub r#type: InodeType,         // file type
-    major: i16,                    // device id
-    minor: i16,                    // device id
+    pub major: i16,                // device id
+    pub minor: i16,                // device id
     pub nlink: i16,                // number of links
     pub size: u32,                 // file size
     pub addrs: [u32; NDIRECT + 1], // data block reference
@@ -65,6 +65,10 @@ pub fn dinode_as_u8_slice(d: &dinode) -> &[u8] {
     unsafe { std::slice::from_raw_parts((d as *const dinode) as *const u8, DINODE_SIZE) }
 }
 
+pub fn dirent_as_u8_slice(d: &dirent) -> &[u8] {
+    unsafe { std::slice::from_raw_parts((d as *const dirent) as *const u8, DIRENT_SIZE) }
+}
+
 pub fn u8_slice_as_dirent(m: &[u8], addr: usize) -> dirent {
     let p = m[addr..addr + DIRENT_SIZE].as_ptr() as *const [u8; DIRENT_SIZE];
     unsafe { std::mem::transmute(*p) }
@@ -87,4 +91,42 @@ pub fn u8_slice_as_u32_slice(m: &[u8], block_num: usize) -> [u32; U32_PER_BLOCK]
     let p =
         m[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE].as_ptr() as *const [u8; BLOCK_SIZE];
     unsafe { std::mem::transmute(*p) }
+}
+
+pub fn u32_slice_as_u8_slice(src: &[u32]) -> [u8; BLOCK_SIZE] {
+    let p = src.as_ptr() as *const [u32; U32_PER_BLOCK];
+    unsafe { std::mem::transmute(*p) }
+}
+
+pub fn search_for_available_inode(
+    img: &memmap::MmapMut,
+    sblock: &superblock,
+) -> Result<usize, &'static str> {
+    let inodestart_addr = sblock.inodestart as usize * BLOCK_SIZE;
+    for i in 0..sblock.ninodes as usize {
+        if img[inodestart_addr + i * DINODE_SIZE as usize
+            ..inodestart_addr + (i + 1) * DINODE_SIZE as usize]
+            .iter()
+            .all(|&x| x == 0)
+        {
+            return Ok(i);
+        }
+    }
+    Err("cannot allocate inode.")
+}
+
+pub fn search_for_available_dblock(
+    img: &memmap::MmapMut,
+    sblock: &superblock,
+) -> Result<usize, &'static str> {
+    let datastart = (sblock.bmapstart + sblock.size / 8) as usize; // start block number of datablock
+    for i in datastart..sblock.size as usize {
+        if img[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE]
+            .iter()
+            .all(|&x| x == 0)
+        {
+            return Ok(i);
+        }
+    }
+    Err("cannot allocate data block.")
 }
