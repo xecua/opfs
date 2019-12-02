@@ -155,9 +155,8 @@ pub fn get(img: &MmapMut, src: &str, dst: &str, sblock: &superblock) {
             break;
         }
         match dst_file.write(
-            &img[(inode.addrs[*i as usize] as usize) * BLOCK_SIZE
-                ..(inode.addrs[*i as usize] as usize) * BLOCK_SIZE
-                    + BLOCK_SIZE.min(file_size - written_size)],
+            &img[(*i as usize) * BLOCK_SIZE
+                ..(*i as usize) * BLOCK_SIZE + BLOCK_SIZE.min(file_size - written_size)],
         ) {
             Ok(s) => written_size += s,
             Err(e) => {
