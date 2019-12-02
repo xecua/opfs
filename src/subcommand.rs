@@ -187,7 +187,8 @@ pub fn rm(img: &mut MmapMut, path: &str, sblock: &superblock) {
 
     let mut data_block_nums: [u32; NDIRECT + 1] = [0; NDIRECT + 1];
     let mut del_flag = false; // delete file or not
-                              // update inode information
+
+    // update inode information
     {
         let mut current_inode: &dinode = extract_inode_pointer_im(&img, inode_num, &sblock);
         if path != "/" {
@@ -202,10 +203,10 @@ pub fn rm(img: &mut MmapMut, path: &str, sblock: &superblock) {
                     {
                         if file_name == from_utf8(&entry.name).unwrap().trim_matches(char::from(0))
                         {
+                            dirent_block_number = current_inode.addrs[i];
                             current_inode =
                                 extract_inode_pointer_im(&img, entry.inum.into(), &sblock);
                             inode_num = entry.inum as usize;
-                            dirent_block_number = current_inode.addrs[i];
                             dirent_offset = j;
                             continue 'directory;
                         }
@@ -237,6 +238,9 @@ pub fn rm(img: &mut MmapMut, path: &str, sblock: &superblock) {
                 eprintln!("{}: no such file or directory", path);
                 exit(1);
             }
+        } else {
+            eprintln!("rm: cannot remove /.");
+            exit(1);
         }
 
         match current_inode.r#type {
