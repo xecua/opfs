@@ -1,6 +1,5 @@
 use crate::block::sblock::superblock;
 use crate::BLOCK_SIZE;
-use memmap::MmapMut;
 use std::mem::transmute;
 
 pub const NDIRECT: usize = 12;
@@ -17,6 +16,7 @@ pub enum InodeType {
     T_DIR = 1,
     T_FILE = 2,
     T_DEV = 3,
+    ZERO = 0, // for resetting
 }
 impl std::fmt::Display for InodeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -25,6 +25,7 @@ impl std::fmt::Display for InodeType {
             T_DIR => write!(f, "directory"),
             T_FILE => write!(f, "file"),
             T_DEV => write!(f, "device file"),
+            ZERO => panic!("type field is not set."),
         }
     }
 }
@@ -49,12 +50,12 @@ pub struct dirent {
 }
 
 // ポインタのキャストだけをしたい
-pub unsafe fn u8_slice_as_dinode<'a>(p: &'a mut [u8]) -> &'a mut dinode {
+pub unsafe fn u8_slice_as_dinode<'a>(p: &'a [u8]) -> &'a mut dinode {
     transmute(p.as_ptr())
 }
 
 pub fn extract_inode_pointer<'a>(
-    img: &'a mut [u8],
+    img: &'a [u8],
     inode_num: usize,
     sblock: &superblock,
 ) -> &'a mut dinode {
@@ -68,14 +69,10 @@ pub fn extract_inode_pointer<'a>(
     let inodestart_byte = sblock.inodestart as usize * BLOCK_SIZE;
     unsafe {
         u8_slice_as_dinode(
-            &mut img[inodestart_byte + inode_num * DINODE_SIZE
+            &img[inodestart_byte + inode_num * DINODE_SIZE
                 ..inodestart_byte + (inode_num + 1) * DINODE_SIZE],
         )
     }
-}
-
-pub fn assign_inode<'a>(src: &'a dinode, dst: &'a mut dinode) {
-    *dst = *src;
 }
 
 // ポインタのキャストだけをしたい
@@ -112,16 +109,17 @@ pub fn dirent_as_u8_slice(d: &dirent) -> &[u8] {
 }
 
 // ポインタのキャストだけをしたい
-pub unsafe fn u8_slice_as_dirent<'a>(p: &'a mut [u8]) -> &'a mut dirent {
+pub unsafe fn u8_slice_as_dirent<'a>(p: &'a [u8]) -> &'a mut dirent {
     transmute(p.as_ptr())
 }
 
-pub fn extract_dirent_pointer<'a>(img: &'a mut [u8], addr: usize) -> &'a mut dirent {
-    unsafe { u8_slice_as_dirent(&mut img[addr..addr + DIRENT_SIZE]) }
-}
-
-pub fn assign_dirent<'a>(src: &'a dirent, dst: &'a mut dirent) {
-    *dst = *src;
+pub fn extract_dirent_pointer<'a>(
+    img: &'a [u8],
+    block_num: usize,
+    offset: usize,
+) -> &'a mut dirent {
+    let addr = block_num * BLOCK_SIZE + offset * DIRENT_SIZE;
+    unsafe { u8_slice_as_dirent(&img[addr..addr + DIRENT_SIZE]) }
 }
 
 pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
@@ -133,6 +131,15 @@ pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
         unsafe { dirents.push(std::mem::transmute(*p)) };
     }
     dirents
+}
+
+// ポインタのキャストだけをしたい
+pub unsafe fn u8_slice_as_block<'a>(p: &'a [u8]) -> &'a mut [u8; BLOCK_SIZE] {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_block_pointer<'a>(img: &'a [u8], block_num: usize) -> &'a mut [u8; BLOCK_SIZE] {
+    unsafe { u8_slice_as_block(&img[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE]) }
 }
 
 // for indirect reference
