@@ -1,5 +1,7 @@
 use crate::block::sblock::superblock;
 use crate::BLOCK_SIZE;
+use memmap::MmapMut;
+use std::mem::transmute;
 
 pub const NDIRECT: usize = 12;
 pub const DIRSIZ: usize = 14;
@@ -46,8 +48,17 @@ pub struct dirent {
     pub name: [u8; DIRSIZ],
 }
 
-pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, sblock: &superblock) -> dinode {
-    if inode_num >= sblock.ninodes {
+// ポインタのキャストだけをしたい
+pub unsafe fn u8_slice_as_dinode<'a>(p: &'a mut [u8]) -> &'a mut dinode {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_inode_pointer<'a>(
+    img: &'a mut [u8],
+    inode_num: usize,
+    sblock: &superblock,
+) -> &'a mut dinode {
+    if inode_num >= sblock.ninodes as usize {
         eprintln!(
             "inode access number limit exceeded: must be less than {}, given {}",
             sblock.ninodes, inode_num
@@ -55,12 +66,43 @@ pub fn u8_slice_as_dinode(m: &[u8], inode_num: u32, sblock: &superblock) -> dino
         std::process::exit(1);
     }
     let inodestart_byte = sblock.inodestart as usize * BLOCK_SIZE;
-    let p = m[inodestart_byte + (inode_num as usize) * DINODE_SIZE
-        ..inodestart_byte + ((inode_num as usize) + 1) * DINODE_SIZE]
-        .as_ptr() as *const [u8; DINODE_SIZE];
-    unsafe { std::mem::transmute(*p) }
+    unsafe {
+        u8_slice_as_dinode(
+            &mut img[inodestart_byte + inode_num * DINODE_SIZE
+                ..inodestart_byte + (inode_num + 1) * DINODE_SIZE],
+        )
+    }
 }
 
+pub fn assign_inode<'a>(src: &'a dinode, dst: &'a mut dinode) {
+    *dst = *src;
+}
+
+// ポインタのキャストだけをしたい
+pub unsafe fn u8_slice_as_dinode_im<'a>(p: &'a [u8]) -> &'a dinode {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_inode_pointer_im<'a>(
+    img: &'a [u8],
+    inode_num: usize,
+    sblock: &superblock,
+) -> &'a dinode {
+    if inode_num >= sblock.ninodes as usize {
+        eprintln!(
+            "inode access number limit exceeded: must be less than {}, given {}",
+            sblock.ninodes, inode_num
+        );
+        std::process::exit(1);
+    }
+    let inodestart_byte = sblock.inodestart as usize * BLOCK_SIZE;
+    unsafe {
+        u8_slice_as_dinode_im(
+            &img[inodestart_byte + inode_num * DINODE_SIZE
+                ..inodestart_byte + (inode_num + 1) * DINODE_SIZE],
+        )
+    }
+}
 pub fn dinode_as_u8_slice(d: &dinode) -> &[u8] {
     unsafe { std::slice::from_raw_parts((d as *const dinode) as *const u8, DINODE_SIZE) }
 }
@@ -69,9 +111,17 @@ pub fn dirent_as_u8_slice(d: &dirent) -> &[u8] {
     unsafe { std::slice::from_raw_parts((d as *const dirent) as *const u8, DIRENT_SIZE) }
 }
 
-pub fn u8_slice_as_dirent(m: &[u8], addr: usize) -> dirent {
-    let p = m[addr..addr + DIRENT_SIZE].as_ptr() as *const [u8; DIRENT_SIZE];
-    unsafe { std::mem::transmute(*p) }
+// ポインタのキャストだけをしたい
+pub unsafe fn u8_slice_as_dirent<'a>(p: &'a mut [u8]) -> &'a mut dirent {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_dirent_pointer<'a>(img: &'a mut [u8], addr: usize) -> &'a mut dirent {
+    unsafe { u8_slice_as_dirent(&mut img[addr..addr + DIRENT_SIZE]) }
+}
+
+pub fn assign_dirent<'a>(src: &'a dirent, dst: &'a mut dirent) {
+    *dst = *src;
 }
 
 pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
