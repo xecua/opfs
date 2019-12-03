@@ -236,7 +236,7 @@ pub fn search_for_available_inode(
     sblock: &superblock,
 ) -> Result<usize, &'static str> {
     let inodestart_addr = sblock.inodestart as usize * BLOCK_SIZE;
-    for i in 0..sblock.ninodes as usize {
+    for i in 1..sblock.ninodes as usize {
         if img[inodestart_addr + i * DINODE_SIZE as usize
             ..inodestart_addr + (i + 1) * DINODE_SIZE as usize]
             .iter()
