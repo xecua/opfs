@@ -3,7 +3,6 @@ use crate::block::inode::*;
 use crate::block::sblock::superblock;
 use crate::BLOCK_SIZE;
 use memmap::MmapMut;
-use std::convert::TryInto;
 use std::process::exit;
 use std::str::from_utf8;
 
@@ -419,7 +418,10 @@ pub fn put(img: &mut MmapMut, src: &str, dst: &str, sblock: &superblock) {
         block_nums.push(block_num);
     }
 
-    for (i, num) in block_nums[..NDIRECT].iter().enumerate() {
+    for (i, num) in block_nums[..NDIRECT.min(block_nums.len())]
+        .iter()
+        .enumerate()
+    {
         inode.addrs[i] = *num as u32;
     }
 
@@ -451,10 +453,15 @@ pub fn put(img: &mut MmapMut, src: &str, dst: &str, sblock: &superblock) {
     let dst_file_name = dst_split[dst_split.len() - 1];
     let dst_parent_name = dst_split[dst_split.len() - 2];
 
+    let mut new_name: [u8; DIRSIZ] = [0u8; DIRSIZ];
+    for (i, c) in dst_file_name.as_bytes().iter().enumerate() {
+        new_name[i] = *c;
+    }
+
     // make dirent
     let new_dirent: dirent = dirent {
         inum: candidate_inode_number as u16,
-        name: dst_file_name.as_bytes()[..DIRSIZ - 1].try_into().unwrap(),
+        name: new_name,
     };
 
     // search for empty entry
