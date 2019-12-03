@@ -1,12 +1,16 @@
 use crate::block::sblock::superblock;
 use crate::BLOCK_SIZE;
+use memmap::MmapMut;
 use std::mem::transmute;
+use std::str::from_utf8;
 
 pub const NDIRECT: usize = 12;
 pub const DIRSIZ: usize = 14;
 
 pub const DINODE_SIZE: usize = std::mem::size_of::<dinode>();
 pub const DIRENT_SIZE: usize = std::mem::size_of::<dirent>();
+
+pub const ROOT_INODE: usize = 1; // inode number of root directory("/")
 
 // dinode.type
 #[repr(i16)]
@@ -49,7 +53,60 @@ pub struct dirent {
     pub name: [u8; DIRSIZ],
 }
 
-// ポインタのキャストだけをしたい
+// explore the given path, and return its inode
+pub fn explore_path<'a>(
+    img: &'a MmapMut,
+    path: &str,
+    sblock: &superblock,
+) -> Result<(&'a dinode, usize), String> {
+    let mut current_inode: &dinode = extract_inode_pointer_im(&img, ROOT_INODE, &sblock);
+    let mut current_inode_num: usize = 0;
+    if path != "/" {
+        'directory: for file_name in path.split("/").skip(1) {
+            for i in 0..NDIRECT {
+                if current_inode.addrs[i] == 0 {
+                    break;
+                }
+                for entry in
+                    extract_dirents_pointer_im(&img, current_inode.addrs[i] as usize).into_iter()
+                {
+                    if file_name == from_utf8(&entry.name).unwrap().trim_matches(char::from(0)) {
+                        current_inode = extract_inode_pointer_im(&img, entry.inum.into(), &sblock);
+                        current_inode_num = entry.inum.into();
+                        continue 'directory;
+                    }
+                }
+            }
+            if current_inode.addrs[NDIRECT] != 0 {
+                // indirect reference block
+                for i in extract_indirect_reference_block_pointer_im(
+                    &img,
+                    current_inode.addrs[NDIRECT] as usize,
+                )
+                .into_iter()
+                {
+                    if *i == 0u32 {
+                        continue;
+                    }
+                    for entry in extract_dirents_pointer_im(&img, (*i) as usize).into_iter() {
+                        if file_name == from_utf8(&entry.name).unwrap().trim_matches(char::from(0))
+                        {
+                            current_inode =
+                                extract_inode_pointer_im(&img, entry.inum.into(), &sblock);
+                            current_inode_num = entry.inum.into();
+                            continue 'directory;
+                        }
+                    }
+                }
+            }
+            // coming here means file does not exist.
+            return Err(format!("{}: no such file or directory", path));
+        }
+    }
+    Ok((current_inode, current_inode_num))
+}
+
+// pointer casting
 pub unsafe fn u8_slice_as_dinode<'a>(p: &'a [u8]) -> &'a mut dinode {
     transmute(p.as_ptr())
 }
@@ -75,7 +132,6 @@ pub fn extract_inode_pointer<'a>(
     }
 }
 
-// ポインタのキャストだけをしたい
 pub unsafe fn u8_slice_as_dinode_im<'a>(p: &'a [u8]) -> &'a dinode {
     transmute(p.as_ptr())
 }
@@ -108,7 +164,6 @@ pub fn dirent_as_u8_slice(d: &dirent) -> &[u8] {
     unsafe { std::slice::from_raw_parts((d as *const dirent) as *const u8, DIRENT_SIZE) }
 }
 
-// ポインタのキャストだけをしたい
 pub unsafe fn u8_slice_as_dirent<'a>(p: &'a [u8]) -> &'a mut dirent {
     transmute(p.as_ptr())
 }
@@ -122,15 +177,15 @@ pub fn extract_dirent_pointer<'a>(
     unsafe { u8_slice_as_dirent(&img[addr..addr + DIRENT_SIZE]) }
 }
 
-pub fn u8_slice_as_dirents_im(m: &[u8], block_num: usize) -> Vec<dirent> {
-    let mut dirents = Vec::new();
-    for i in 0..BLOCK_SIZE / DIRENT_SIZE {
-        let p = m[block_num * BLOCK_SIZE + DIRENT_SIZE * i
-            ..block_num * BLOCK_SIZE + DIRENT_SIZE * (i + 1)]
-            .as_ptr() as *const [u8; DIRENT_SIZE];
-        unsafe { dirents.push(std::mem::transmute(*p)) };
-    }
-    dirents
+pub unsafe fn u8_slice_as_dirents_im<'a>(p: &'a [u8]) -> &'a [dirent; BLOCK_SIZE / DIRENT_SIZE] {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_dirents_pointer_im<'a>(
+    img: &'a [u8],
+    block_num: usize,
+) -> &'a [dirent; BLOCK_SIZE / DIRENT_SIZE] {
+    unsafe { u8_slice_as_dirents_im(&img[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE]) }
 }
 
 pub unsafe fn u8_slice_as_dirents<'a>(p: &'a [u8]) -> &'a mut [dirent; BLOCK_SIZE / DIRENT_SIZE] {
