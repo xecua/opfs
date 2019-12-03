@@ -104,9 +104,9 @@ fn main() {
     } else if let Some(ref matches) = matches.subcommand_matches("rm") {
         let path = matches.value_of("path").unwrap();
         subcommand::rm(&mut img, &path, &sblock);
-        // } else if let Some(ref matches) = matches.subcommand_matches("put") {
-        //     let src = matches.value_of("source").unwrap();
-        //     let dst = matches.value_of("destination").unwrap();
-        //     subcommand::put(&mut img, &src, &dst, &sblock);
+    } else if let Some(ref matches) = matches.subcommand_matches("put") {
+        let src = matches.value_of("source").unwrap();
+        let dst = matches.value_of("destination").unwrap();
+        subcommand::put(&mut img, &src, &dst, &sblock);
     }
 }

@@ -122,7 +122,7 @@ pub fn extract_dirent_pointer<'a>(
     unsafe { u8_slice_as_dirent(&img[addr..addr + DIRENT_SIZE]) }
 }
 
-pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
+pub fn u8_slice_as_dirents_im(m: &[u8], block_num: usize) -> Vec<dirent> {
     let mut dirents = Vec::new();
     for i in 0..BLOCK_SIZE / DIRENT_SIZE {
         let p = m[block_num * BLOCK_SIZE + DIRENT_SIZE * i
@@ -133,7 +133,17 @@ pub fn u8_slice_as_dirents(m: &[u8], block_num: usize) -> Vec<dirent> {
     dirents
 }
 
-// ポインタのキャストだけをしたい
+pub unsafe fn u8_slice_as_dirents<'a>(p: &'a [u8]) -> &'a mut [dirent; BLOCK_SIZE / DIRENT_SIZE] {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_dirents_pointer<'a>(
+    img: &'a [u8],
+    block_num: usize,
+) -> &'a mut [dirent; BLOCK_SIZE / DIRENT_SIZE] {
+    unsafe { u8_slice_as_dirents(&img[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE]) }
+}
+
 pub unsafe fn u8_slice_as_block<'a>(p: &'a [u8]) -> &'a mut [u8; BLOCK_SIZE] {
     transmute(p.as_ptr())
 }
@@ -143,16 +153,27 @@ pub fn extract_block_pointer<'a>(img: &'a [u8], block_num: usize) -> &'a mut [u8
 }
 
 // for indirect reference
-const U32_PER_BLOCK: usize = BLOCK_SIZE / std::mem::size_of::<u32>();
-pub fn u8_slice_as_u32_slice(m: &[u8], block_num: usize) -> [u32; U32_PER_BLOCK] {
-    let p =
-        m[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE].as_ptr() as *const [u8; BLOCK_SIZE];
-    unsafe { std::mem::transmute(*p) }
+pub const U32_PER_BLOCK: usize = BLOCK_SIZE / std::mem::size_of::<u32>();
+
+pub unsafe fn u8_slice_as_u32_slice_im<'a>(p: &'a [u8]) -> &'a [u32; U32_PER_BLOCK] {
+    transmute(p.as_ptr())
+}
+pub fn extract_indirect_reference_block_pointer_im<'a>(
+    m: &'a [u8],
+    block_num: usize,
+) -> &'a [u32; U32_PER_BLOCK] {
+    unsafe { u8_slice_as_u32_slice_im(&m[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE]) }
 }
 
-pub fn u32_slice_as_u8_slice(src: &[u32]) -> [u8; BLOCK_SIZE] {
-    let p = src.as_ptr() as *const [u32; U32_PER_BLOCK];
-    unsafe { std::mem::transmute(*p) }
+pub unsafe fn u8_slice_as_u32_slice<'a>(p: &'a [u8]) -> &'a mut [u32; U32_PER_BLOCK] {
+    transmute(p.as_ptr())
+}
+
+pub fn extract_indirect_reference_block_pointer<'a>(
+    img: &'a [u8],
+    block_num: usize,
+) -> &'a mut [u32; U32_PER_BLOCK] {
+    unsafe { u8_slice_as_u32_slice(&img[block_num * BLOCK_SIZE..(block_num + 1) * BLOCK_SIZE]) }
 }
 
 pub fn search_for_available_inode(
@@ -176,7 +197,7 @@ pub fn search_for_available_dblock(
     img: &memmap::MmapMut,
     sblock: &superblock,
 ) -> Result<usize, &'static str> {
-    let datastart = (sblock.bmapstart + sblock.size / 8) as usize; // start block number of datablock
+    let datastart = (sblock.bmapstart + sblock.size / 8) as usize; // start block number of data block
     for i in datastart..sblock.size as usize {
         if img[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE]
             .iter()
